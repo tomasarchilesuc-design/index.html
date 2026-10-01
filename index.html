@@ -128,7 +128,7 @@ function stock(){
   <button onclick="ingreso()">Ingresar a bodega</button>
   ${msg?`<div class="msg ${msg.startsWith('!')?'err':''}">${esc(msg.replace(/^!/,''))}</div>`:''}</div>
   <h2>Inventario (${ps.reduce((a,p)=>a+p.qty,0)} equipos · ${$(ps.reduce((a,p)=>a+p.qty*p.price,0))} en etiqueta)</h2>
-  <div class="card">${ps.length?ps.map(p=>`<div class="item"><div>${esc(p.name)}<small>${$(p.price)}</small></div>
+  <div class="card">${ps.length?ps.map(p=>`<div class="item"><div>${esc(p.name)}<small>${$(p.price)}</small><button class="sm del" style="margin-top:6px" onclick="delProd('${p.id}')">Eliminar</button></div>
   <div style="display:flex;gap:6px;align-items:center"><button class="sm" aria-label="Quitar uno" onclick="adj('${p.id}',-1)">−1</button><b class="${p.qty<=2?'low':''}" style="min-width:28px;text-align:center">${p.qty}</b><button class="sm" aria-label="Sumar uno" onclick="adj('${p.id}',1)">+1</button></div></div>`).join(''):'<div class="empty">Bodega vacía. Ingresa tu primer equipo arriba.</div>'}</div>`;
 }
 const num=id=>parseFloat(document.getElementById(id).value);
@@ -139,6 +139,10 @@ function ingreso(){
   let e=S.products.find(x=>x.name.toLowerCase()===n.toLowerCase());
   if(e){e.qty+=q;e.price=p}else S.products.push({id:uid(),name:n,price:p,qty:q});
   save();msg=`Ingresaste ${q} × ${n}.`;render()
+}
+function delProd(id){
+  const p=S.products.find(x=>x.id===id);if(!p||!confirm('¿Eliminar "'+p.name+'" del stock? Las ventas ya registradas no se borran.'))return;
+  S.products=S.products.filter(x=>x.id!==id);save();msg='';render()
 }
 function adj(id,d){const p=S.products.find(x=>x.id===id);if(p){p.qty=Math.max(0,p.qty+d);save();render()}}
 function venta(){
