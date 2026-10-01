@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ventas Xiaomi</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#f6f5f3;--card:#fff;--ink:#1d1d1f;--mute:#76736e;--line:#e6e3de;--acc:#ff6900;--ok:#1f8a4c;--bad:#c93c2a;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -49,10 +52,19 @@ nav button[aria-current="true"]{color:var(--acc);box-shadow:inset 0 3px 0 var(--
 <main id="app"></main>
 <nav id="nav"></nav>
 <script>
-const KEY='ventas-xiaomi-v1';
-let S={meta:0,products:[],sales:[]},tab='panel',msg='';
-try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+// Pega aquí la configuración de tu proyecto Firebase
+const FB={apiKey:"AIzaSyD5qNPxkilVxYG6amD4iSveXhruDC6wbl8",authDomain:"ventas-xiaomi.firebaseapp.com",projectId:"ventas-xiaomi",storageBucket:"ventas-xiaomi.firebasestorage.app",messagingSenderId:"244391744909",appId:"1:244391744909:web:434a86d511e78ed2b699c4"};
+firebase.initializeApp(FB);
+const auth=firebase.auth(),fs=firebase.firestore();
+const EMPTY=()=>({meta:0,products:[],sales:[]});
+let S=EMPTY(),tab='panel',msg='',user=null,ref=null,ready=false,status='',loginErr='',tm;
+const save=()=>{if(!ref)return;status='Guardando…';paintStatus();clearTimeout(tm);
+  tm=setTimeout(()=>ref.set(JSON.parse(JSON.stringify(S))).then(()=>{status='Guardado en la nube';paintStatus()}).catch(()=>{status='Sin conexión: no se pudo guardar';paintStatus()}),400)};
+auth.onAuthStateChanged(async u=>{
+  user=u;ref=null;S=EMPTY();
+  if(u){ref=fs.doc('users/'+u.uid);try{const d=await ref.get();if(d.exists)S=Object.assign(EMPTY(),d.data());status='Guardado en la nube'}catch(e){status='No se pudieron cargar tus datos'}}
+  ready=true;render();
+});
 const $=n=>'$'+Math.round(n).toLocaleString('es-CL');
 const M=n=>'$'+(n/1e6).toLocaleString('es-CL',{maximumFractionDigits:2})+' M';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -85,7 +97,8 @@ function panel(){
   <input id="meta" type="number" inputmode="numeric" value="${meta||''}" placeholder="25000000">
   <button onclick="setMeta()">Guardar meta</button></div>
   <h2>Últimas ventas</h2>
-  <div class="card">${recent.length?recent.map(saleRow).join(''):'<div class="empty">Aún no registras ventas este mes. Ve a Vender para empezar.</div>'}</div>`;
+  <div class="card">${recent.length?recent.map(saleRow).join(''):'<div class="empty">Aún no registras ventas este mes. Ve a Vender para empezar.</div>'}</div>
+  <p class="mute" id="st" style="margin-top:18px">${status}</p><button class="sm" onclick="auth.signOut()">Cerrar sesión</button>`;
 }
 function saleRow(s,del){return `<div class="item"><div>${esc(s.name)} ×${s.qty}<small>${s.date} · <span class="tag ${s.channel==='Internet'?'web':''}">${s.channel}</span>${s.counts?'':' · no cuenta para meta'}</small></div>
 <div style="text-align:right"><b>${$(s.price*s.qty)}</b>${del?`<br><button class="sm del" onclick="delSale('${s.id}')">Anular</button>`:''}</div></div>`}
@@ -142,7 +155,14 @@ function delSale(id){
   S.sales=S.sales.filter(x=>x.id!==id);save();msg='';render()
 }
 function go(t){tab=t;msg='';render();window.scrollTo(0,0)}
+function loginView(){return `<h1>Ventas Xiaomi</h1><div class="card">
+  <label for="em" style="margin-top:0">Correo</label><input id="em" type="email" autocomplete="username">
+  <label for="pw">Clave</label><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">Ingresar</button>${loginErr?`<div class="msg err">${esc(loginErr)}</div>`:''}</div>`}
+function login(){loginErr='';auth.signInWithEmailAndPassword(document.getElementById('em').value.trim(),document.getElementById('pw').value).catch(()=>{loginErr='Correo o clave incorrectos.';render()})}
+function paintStatus(){const e=document.getElementById('st');if(e)e.textContent=status}
 function render(){
+  if(!ready||!user){document.getElementById('nav').innerHTML='';document.getElementById('app').innerHTML=ready?loginView():'<p class="mute">Cargando…</p>';return}
   document.getElementById('app').innerHTML=tab==='panel'?panel():tab==='vender'?vender():stock();
   document.getElementById('nav').innerHTML=[['panel','Panel'],['vender','Vender'],['stock','Stock']].map(([k,l])=>`<button onclick="go('${k}')" aria-current="${tab===k}">${l}</button>`).join('');
 }
